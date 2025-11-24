@@ -14,8 +14,8 @@
       margin: 0;
       padding: 0;
       overflow-x: hidden;
-      overflow-y: auto; /* Pastikan bisa scroll */
-      -webkit-overflow-scrolling: touch; /* Smooth scroll di iOS */
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       touch-action: manipulation;
     }
     body {
@@ -24,12 +24,12 @@
       font-family: 'Poppins', sans-serif;
       min-height: 100vh;
       padding: 15px 10px;
-      display: block; /* Ubah dari flex agar bisa scroll */
+      display: block;
     }
     .spin-container {
       width: 100%;
       max-width: 390px;
-      margin: 20px auto; /* Pusatkan & beri jarak dari atas */
+      margin: 20px auto;
       background: rgba(17, 17, 17, 0.95);
       border-radius: 32px;
       padding: 28px 20px;
@@ -204,8 +204,6 @@
         opacity: 0;
       }
     }
-
-    /* Responsif untuk layar kecil */
     @media (max-width: 400px) {
       .spin-container { padding: 24px 16px; }
       #wheel-container { width: 210px; height: 210px; margin: 25px auto; }
@@ -233,24 +231,22 @@
   </button>
   <div id="result"></div>
 </div>
-
-<!-- Audio -->
 <audio id="spinSound" preload="auto">
   <source src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3" type="audio/mpeg">
 </audio>
 <audio id="winSound" preload="auto">
   <source src="https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3" type="audio/mpeg">
 </audio>
-
 <script>
 const prizes = [
   {text: "Rp25K", color: "#a29bfe"},
   {text: "Rp50K", color: "#74b9ff"},
-  {text: "Rp100K", color: "#81ecec"},
-  {text: "Rp200K", color: "#fab1a0"},
-  {text: "Rp500K", color: "#ff7675"},
-  {text: "Rp1JT", color: "#ffd700", glow: true}
+  {text: "Rp75K", color: "#81ecec"},
+  {text: "Rp100K", color: "#fab1a0"},
+  {text: "Rp150K", color: "#ff7675"},
+  {text: "Rp200K", color: "#ffd700", glow: true}
 ];
+
 const wheel = document.getElementById('wheel');
 const ctx = wheel.getContext('2d');
 const spinBtn = document.getElementById('spinBtn');
@@ -258,7 +254,9 @@ const resultDiv = document.getElementById('result');
 const userIdInput = document.getElementById('userId');
 const spinSound = document.getElementById('spinSound');
 const winSound = document.getElementById('winSound');
+
 let isSpinning = false;
+let currentRotation = 0;
 
 if (localStorage.getItem('hasSpun') === 'true') {
   userIdInput.disabled = true;
@@ -268,26 +266,33 @@ if (localStorage.getItem('hasSpun') === 'true') {
 }
 
 function drawWheel() {
-  const num = prizes.length;
-  const angle = (2 * Math.PI) / num;
-  const centerX = wheel.width / 2, centerY = wheel.height / 2, radius = centerX - 10;
-  prizes.forEach((p, i) => {
-    const start = i * angle;
+  const numPrizes = prizes.length;
+  const segmentAngle = (2 * Math.PI) / numPrizes;
+  const centerX = wheel.width / 2;
+  const centerY = wheel.height / 2;
+  const radius = centerX - 10;
+  const rotationOffset = -Math.PI / 2 - segmentAngle / 2;
+
+  prizes.forEach((prize, i) => {
+    const startAngle = rotationOffset + i * segmentAngle;
+    const endAngle = startAngle + segmentAngle;
+
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
-    ctx.arc(centerX, centerY, radius, start, start + angle);
-    ctx.fillStyle = p.color;
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    ctx.fillStyle = prize.color;
     ctx.fill();
     ctx.strokeStyle = "#000";
     ctx.lineWidth = 3;
     ctx.stroke();
+
     ctx.save();
     ctx.translate(centerX, centerY);
-    ctx.rotate(start + angle / 2);
-    ctx.fillStyle = p.glow ? "#000" : "#fff";
+    ctx.rotate(startAngle + segmentAngle / 2);
+    ctx.fillStyle = prize.glow ? "#000" : "#fff";
     ctx.font = "bold 15px Arial";
     ctx.textAlign = "center";
-    ctx.fillText(p.text, radius * 0.65, 5);
+    ctx.fillText(prize.text, radius * 0.65, 5);
     ctx.restore();
   });
 }
@@ -307,6 +312,24 @@ function createConfetti() {
   }
 }
 
+function calculateWinningRotation(winningIndex) {
+  const numPrizes = prizes.length;
+  const segmentAngle = 360 / numPrizes;
+  
+  const currentAngle = currentRotation % 360;
+  
+  const targetAngle = 360 - (winningIndex * segmentAngle);
+  
+  let deltaRotation = (targetAngle - currentAngle) % 360;
+  if (deltaRotation < 0) deltaRotation += 360;
+  
+  const fullSpins = 5 + Math.floor(Math.random() * 3);
+  
+  const totalRotation = (fullSpins * 360) + deltaRotation;
+  
+  return totalRotation;
+}
+
 userIdInput.addEventListener('input', () => {
   const uid = userIdInput.value.trim();
   const valid = /^[a-zA-Z0-9]{4,20}$/.test(uid);
@@ -316,27 +339,43 @@ userIdInput.addEventListener('input', () => {
 
 spinBtn.addEventListener('click', () => {
   if (isSpinning || localStorage.getItem('hasSpun') === 'true') return;
+  
   isSpinning = true;
   spinBtn.disabled = true;
   resultDiv.innerHTML = '';
+  
   spinSound.play().catch(() => {});
+  
   const randomIndex = Math.floor(Math.random() * prizes.length);
-  const spins = 8 + randomIndex;
-  const degrees = spins * 360 + Math.random() * 360;
-  wheel.style.transform = `rotate(${degrees}deg)`;
+  
+  const finalRotation = calculateWinningRotation(randomIndex);
+  
+  currentRotation += finalRotation;
+  
+  wheel.style.transform = `rotate(${currentRotation}deg)`;
+  
   setTimeout(() => {
     spinSound.pause();
     winSound.play().catch(() => {});
     createConfetti();
+    
+    currentRotation = currentRotation % 360;
+    wheel.style.transition = 'none';
+    wheel.style.transform = `rotate(${currentRotation}deg)`;
+    setTimeout(() => {
+      wheel.style.transition = 'transform 5s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+    }, 50);
+    
     const prize = prizes[randomIndex];
     const userId = userIdInput.value.trim().toUpperCase();
-   
+  
     resultDiv.innerHTML = `
       <div class="text-success jackpot-glow">SELAMAT ${userId}!</div>
       <div class="text-warning fs-2 fw-bold mt-2">Kamu Dapat ${prize.text}</div>
       <small class="text-success mt-2 d-block">Hadiah masuk ke USER ID: <b>${userId}</b></small>
       <small class="text-muted">Cek saldo dalam 1 menit!</small>
     `;
+    
     localStorage.setItem('hasSpun', 'true');
     userIdInput.disabled = true;
     spinBtn.innerHTML = '<i class="fas fa-check"></i> SUDAH DIKLAIM';
